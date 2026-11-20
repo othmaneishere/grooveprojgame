@@ -2,6 +2,7 @@ import * as T from 'three';
 import { mergeGeometries } from './vendor/BufferGeometryUtils.js';
 import { LEVEL,WALL,HALL,WIDTH,DEPTH,STAIR,rooms } from './layout.js';
 import { furnish } from './furnish.js';
+import { furnitureFinish,furnitureSets } from './furniture-materials.js';
 
 export async function buildHouse(scene) {
   const loader=new T.TextureLoader();
@@ -13,6 +14,16 @@ export async function buildHouse(scene) {
     texture.anisotropy=4;
     return [name,texture];
   })));
+  const furniture=Object.fromEntries(await Promise.all(
+    Object.entries(furnitureSets).flatMap(([group, names])=>names.map(async name=>{
+      const map=await loader.loadAsync(new URL('./assets/furniture/'+name+'.webp',import.meta.url).href);
+      map.colorSpace=T.SRGBColorSpace;
+      map.anisotropy=4;
+      map.wrapS=map.wrapT=T.MirroredRepeatWrapping;
+      const {roughness,metalness,bump}=furnitureFinish(name,group);
+      return [name,new T.MeshStandardMaterial({map,roughness,metalness,bumpMap:map,bumpScale:bump})];
+    })),
+  ));
   const paint=(color,pattern,roughness=.83,metalness=0)=>{
     const map=textures[pattern]??null;
     return new T.MeshStandardMaterial({color,map,roughness,metalness,
@@ -85,8 +96,18 @@ export async function buildHouse(scene) {
       const bevel=Math.min(.028,d*.17);
       const g=new T.ExtrudeGeometry(s,{depth:d-2*bevel,bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel,bevelSegments:2,curveSegments:4,steps:1});
       g.translate(0,0,-(d-2*bevel)/2);
-      const uv=g.attributes.uv;
-      for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*1.8,uv.getY(i)*1.8);
+      const {uv,position,normal}=g.attributes;
+      // Project each triangle onto its facing plane at a uniform physical scale.
+      // This gives the top, front and sides separate, unstretched grain.
+      for(let i=0;i<uv.count;i+=3){
+        const nx=Math.abs(normal.getX(i)),ny=Math.abs(normal.getY(i)),nz=Math.abs(normal.getZ(i));
+        const onSide=nx>ny&&nx>nz, onTop=ny>nz&&!onSide;
+        for(let j=i;j<i+3;j++){
+          const u=onSide?position.getZ(j):position.getX(j);
+          const v=onTop?-position.getZ(j):position.getY(j);
+          uv.setXY(j,.5+u*1.26,.5+v*1.26);
+        }
+      }
       return g;
     });
     return mesh(parent,geometry,material,x,y,z);
@@ -238,7 +259,7 @@ export async function buildHouse(scene) {
     pivot.traverse(o=>{if(o.isMesh)o.receiveShadow=true;});
   }
 
-  const kit={m,paint,group,box,block,oval,cylinder,lathe,round,point,frame,shade};
+  const kit={m,furniture,paint,group,box,block,oval,cylinder,lathe,round,point,frame,shade};
   for(const room of rooms){
     const {side,front,level,color}=room;
     const y=LEVEL*level, z=DEPTH*(front?.5:-.5);

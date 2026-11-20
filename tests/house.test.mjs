@@ -13,7 +13,7 @@ const {buildHouse}=await import('../dist/house.js');
 const {rooms,LEVEL,SPAWN,doorHits,movePlayer,locationAt}=await import('../dist/layout.js');
 const scene=new T.Scene();
 const {solids,doors}=await buildHouse(scene);
-assert.equal(loaded.length,12);
+assert.equal(loaded.length,48);
 for(const url of loaded){
   const image=readFileSync(new URL(url));
   assert.equal(image.subarray(8,12).toString(),'WEBP',url);
@@ -21,6 +21,10 @@ for(const url of loaded){
 assert.equal(doors.length,rooms.length);
 let triangles=0;
 scene.traverse(o=>{if(o.isMesh)triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;});
+const mapped=new Set();
+scene.traverse(o=>{if(o.isMesh&&o.material.map)mapped.add(o.material.map);});
+assert.equal([...mapped].filter(map=>map.wrapS===T.MirroredRepeatWrapping).length,36,
+  'Every furniture texture is used by a rendered mesh');
 let p={...SPAWN};
 function walk(target,player=p){
   const dx=target[0]-player.x,dz=target[1]-player.z;

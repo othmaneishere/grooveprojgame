@@ -25,3 +25,12 @@ The WebP files in `dist/assets/` were cropped and optimized from three atlases g
 - Four flat, evenly lit architectural materials in a 2×2 atlas: smoked oak grain, honed ivory limestone, oatmeal woven upholstery and warm lime plaster.
 - Four decor surfaces in a 2×2 atlas: an original dusk landscape painting, a faded red and navy ornamental rug, an original pear and olive-branch still life, and repeating ivory, faded teal and terracotta tile.
 - Four decor surfaces in a 2×2 atlas: an indigo and smoky gold botanical rug, a cream Moroccan flatweave with geometric medallions, an original still life of blossoms and books, and an original painting of an Iberian courtyard.
+
+The 36 furniture textures in `dist/assets/furniture/` came from four additional 3×3 atlases generated with built-in ImageGen. Each prompt called for nine edge-to-edge, orthographic material swatches under neutral lighting, with no labels or props.
+
+- **Woods** cover walnut, English oak, mahogany, limed ash, olive-painted oak and rosewood.
+- **Upholstery** covers forest velvet, cognac leather, rust herringbone, petrol chenille, rose bouclé, oatmeal linen, striped ticking, moss tartan and Moroccan diamond weave.
+- **Bedding** covers cotton percale, sage wool, rose linen, navy windowpane, clay jacquard, sand quilting, ochre velvet, taupe pinstripe and ivory damask.
+- **Details** cover verdigris and satin brass, saddle leather, botanical linen, Iberian weave, Moroccan flatweave, burgundy damask, charcoal tweed and houndstooth.
+
+Each furniture texture is a 384×384 WebP. Filenames and rendering finishes are defined in `dist/furniture-materials.js`.
