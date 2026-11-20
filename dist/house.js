@@ -511,6 +511,8 @@ export async function buildHouse(scene,{onProgress=()=>{}}={}) {
   const step=(STAIR.bottom-STAIR.top)/STAIR.count;
   const rise=LEVEL/STAIR.count;
   const mid=(STAIR.left+STAIR.right)/2;
+  const stairRunner=furniture['moss-flatweave'];
+  const runnerRepeat=(STAIR.bottom-STAIR.top+LEVEL)/1.36;
   const railProfile=[[.048,0],[.048,.10],[.031,.17],[.035,.29],[.052,.38],[.032,.49],[.022,.75],[.040,.83],[.04,.9],[0,.9]];
   for(let i=0;i<STAIR.count;i++){
     const z=STAIR.bottom-(i+.5)*step;
@@ -520,17 +522,17 @@ export async function buildHouse(scene,{onProgress=()=>{}}={}) {
     const runner=shape('runner'+i,()=>{
       const geometry=new T.PlaneGeometry(1.01,step+.010);
       const uv=geometry.attributes.uv;
-      for(let j=0;j<uv.count;j++)uv.setY(j,(i+.38+uv.getY(j)*.62)/STAIR.count);
+      for(let j=0;j<uv.count;j++)uv.setY(j,(i+.38+uv.getY(j)*.62)*runnerRepeat/STAIR.count);
       return geometry;
     });
-    mesh(staticRoot,runner,m.rug,mid,h+.004,z).rotation.x=-Math.PI/2;
+    mesh(staticRoot,runner,stairRunner,mid,h+.004,z).rotation.x=-Math.PI/2;
     const fabricRiser=shape('riser'+i,()=>{
       const geometry=new T.PlaneGeometry(1.002,rise-.025);
       const uv=geometry.attributes.uv;
-      for(let j=0;j<uv.count;j++)uv.setY(j,(i+uv.getY(j)*.38)/STAIR.count);
+      for(let j=0;j<uv.count;j++)uv.setY(j,(i+uv.getY(j)*.38)*runnerRepeat/STAIR.count);
       return geometry;
     });
-    mesh(staticRoot,fabricRiser,m.rug,mid,h-rise/2-.005,z+step/2+.001);
+    mesh(staticRoot,fabricRiser,stairRunner,mid,h-rise/2-.005,z+step/2+.001);
     cylinder(staticRoot,mid,h-rise+.019,z+step/2+.018,.009,1.05,m.brass).rotation.z=Math.PI/2;
     for(const sign of [-1,1]){
       oval(staticRoot,mid+sign*.526,h-rise+.019,z+step/2+.018,.015,.012,.012,m.brass);
