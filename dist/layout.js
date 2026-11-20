@@ -39,15 +39,15 @@ export function floorAt(x,z,currentY) {
   return 0;
 }
 
-export function overlaps(x,y,z,b) {
-  if (y >= b.maxY-.01 || y+BODY <= b.minY) return false;
+export function overlaps(x,y,z,b,height=BODY) {
+  if (y >= b.maxY-.01 || y+height <= b.minY) return false;
   const dx = x-Math.max(b.minX,Math.min(x,b.maxX));
   const dz = z-Math.max(b.minZ,Math.min(z,b.maxZ));
   return dx*dx+dz*dz < RADIUS*RADIUS;
 }
 
-export function doorHits(door,angle,x,y,z) {
-  if (y >= door.y+2.36 || y+BODY <= door.y) return false;
+export function doorHits(door,angle,x,y,z,height=BODY) {
+  if (y >= door.y+2.36 || y+height <= door.y) return false;
   const dx=x-door.x, dz=z-door.z;
   const along=dx*Math.sin(angle)+dz*Math.cos(angle);
   const across=dx*Math.cos(angle)-dz*Math.sin(angle);
@@ -56,13 +56,67 @@ export function doorHits(door,angle,x,y,z) {
   return end*end+edge*edge < RADIUS*RADIUS;
 }
 
-export function movePlayer(player, dx, dz, solids, doors) {
-  for (const [mx,mz] of [[dx,0],[0,dz]]) {
-    const x=player.x+mx, z=player.z+mz;
-    const y=floorAt(x,z,player.y);
-    if (Math.abs(y-player.y)>.29) continue;
-    if (solids.some(b=>overlaps(x,y,z,b))) continue;
-    if (doors.some(d=>doorHits(d,d.angle,x,y,z))) continue;
-    Object.assign(player,{x,y,z});
+export function indexSolids(solids, cellSize=1.5) {
+  const cells=new Map();
+  for(const solid of solids){
+    const left=Math.floor((solid.minX-RADIUS)/cellSize);
+    const right=Math.floor((solid.maxX+RADIUS)/cellSize);
+    const near=Math.floor((solid.minZ-RADIUS)/cellSize);
+    const far=Math.floor((solid.maxZ+RADIUS)/cellSize);
+    for(let x=left;x<=right;x++)for(let z=near;z<=far;z++){
+      const key=x+':'+z;
+      if(!cells.has(key))cells.set(key,[]);
+      cells.get(key).push(solid);
+    }
   }
+  const empty=[];
+  return (x,z)=>cells.get(Math.floor(x/cellSize)+':'+Math.floor(z/cellSize))??empty;
+}
+
+export function canOccupy(x,y,z,height,solids,doors) {
+  const nearby=typeof solids==='function'?solids(x,z):solids;
+  return !nearby.some(b=>overlaps(x,y,z,b,height)) &&
+    !doors.some(d=>doorHits(d,d.angle,x,y,z,height));
+}
+
+function advance(player,dx,dz,solids,doors){
+  const x=player.x+dx,z=player.z+dz,y=floorAt(x,z,player.y);
+  if(Math.abs(y-player.y)>.25 || !canOccupy(x,y,z,player.height??BODY,solids,doors))return false;
+  Object.assign(player,{x,y,z});
+  return true;
+}
+
+export function movePlayer(player, dx, dz, solids, doors) {
+  const steps=Math.ceil(Math.hypot(dx,dz)/.065);
+  if(!steps)return;
+  dx/=steps;dz/=steps;
+  for(let i=0;i<steps;i++){
+    if(advance(player,dx,dz,solids,doors))continue;
+    if(Math.abs(dx)>=Math.abs(dz)){
+      if(dx)advance(player,dx,0,solids,doors);
+      if(dz)advance(player,0,dz,solids,doors);
+    }else{
+      if(dz)advance(player,0,dz,solids,doors);
+      if(dx)advance(player,dx,0,solids,doors);
+    }
+  }
+}
+
+export function advanceDoor(door,dt,player){
+  if(door.angle===door.target && !door.speed)return 'rest';
+  const opening=door.target!==0;
+  const oldAngle=door.angle;
+  const delta=door.target-oldAngle;
+  const velocity=(door.speed??0)+(delta*(opening?31:42)-(door.speed??0)*11.7)*dt;
+  const speed=Math.max(-2.7,Math.min(2.7,velocity));
+  let next=oldAngle+speed*dt;
+  const settled=delta*(door.target-next)<=0 || (Math.abs(delta)<.0035 && Math.abs(speed)<.095);
+  if(settled)next=door.target;
+  if(doorHits(door,next,player.x,player.y,player.z,player.height??BODY)){
+    door.speed=0;
+    return 'blocked';
+  }
+  door.angle=next;
+  door.speed=settled?0:speed;
+  return settled?(opening?'open':'latched'):'moving';
 }

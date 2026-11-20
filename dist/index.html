@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="A first-person tour of a furnished, two-storey house.">
   <title>Ashbourne House</title>
+  <link rel="icon" href="./favicon.png" type="image/png">
   <link rel="stylesheet" href="./house.css">
   <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
 </head>
@@ -12,11 +13,13 @@
   <main id="world" aria-label="Ashbourne House 3D interior"></main>
   <div class="vignette" aria-hidden="true"></div>
   <div id="reticle" hidden aria-hidden="true"></div>
+  <div id="look-hint" hidden>Drag to look around</div>
   <div id="interaction" hidden><kbd>E</kbd> <span></span></div>
   <aside id="location" hidden><span id="storey"></span><h2 id="room"></h2></aside>
   <button id="pause" hidden aria-label="Pause">Ⅱ</button>
   <div id="touch" hidden aria-label="Touch controls">
-    <div id="stick"></div><button id="touch-door" aria-label="Use door">Door</button>
+    <div id="stick"></div><button id="touch-crouch" aria-pressed="false">Crouch</button>
+    <button id="touch-use" aria-label="Interact">Use</button>
   </div>
   <section id="menu" aria-labelledby="title">
     <div class="plate">
@@ -24,10 +27,35 @@
       <h1 id="title">Ashbourne<br>House</h1>
       <p id="status" role="status">Preparing the house…</p>
       <button id="enter" disabled>Explore the house</button>
-      <div id="keys"><kbd>W A S D</kbd> Move <kbd>Mouse</kbd> Look <kbd>E</kbd> Door <kbd>Esc</kbd> Pause</div>
-      <div id="links" hidden><button id="reset">Return to entrance</button><label><input id="quiet" type="checkbox"> Reduce motion</label></div>
+      <div id="keys"><kbd>W A S D</kbd> Walk <kbd>Mouse</kbd> Look <kbd>E</kbd> Interact
+        <kbd>Shift</kbd> Quick walk <kbd>C</kbd> Crouch <kbd>Esc</kbd> Pause</div>
+      <details id="settings">
+        <summary>Settings</summary>
+        <div class="settings-grid">
+          <label for="volume">Sound</label><input id="volume" type="range" min="0" max="100" value="58">
+          <label for="sensitivity">Look sensitivity</label><input id="sensitivity" type="range" min="50" max="175" value="100">
+          <label for="graphics">Graphics</label>
+          <select id="graphics"><option value="auto">Auto</option><option value="performance">Performance</option>
+            <option value="balanced">Balanced</option><option value="high">High</option></select>
+          <label for="atmosphere">Lighting</label>
+          <select id="atmosphere"><option value="day">Daylight</option><option value="evening">Evening</option></select>
+          <label class="motion"><input id="quiet" type="checkbox"> Reduce camera motion</label>
+          <p id="keyboard-tip">Keyboard look: <kbd>Q</kbd> <kbd>R</kbd> turn · <kbd>PgUp</kbd> <kbd>PgDn</kbd> look up and down</p>
+        </div>
+      </details>
+      <div id="links" hidden><button id="reset">Return to entrance</button></div>
     </div>
   </section>
+  <dialog id="ledger" aria-labelledby="ledger-title">
+    <div class="ledger-page">
+      <span class="letterhead">Ashbourne House</span>
+      <h2 id="ledger-title">The house ledger</h2>
+      <dl><dt>Drawing room</dt><dd>Brush the green velvet against the pile. Leave the hearth damper open until the last of the embers have cooled.</dd>
+        <dt>Kitchen</dt><dd>The old iron stove is gone. We kept its tiles for the splashback and set new clay pavers where the flagstones had split.</dd>
+        <dt>Upstairs</dt><dd>Keep the oak on the landing bare at the edges. The indigo runner was cut narrow so the old boards would still show.</dd></dl>
+      <form method="dialog"><button>Close ledger</button></form>
+    </div>
+  </dialog>
   <script type="module" src="./main.js"></script>
 </body>
 </html>
