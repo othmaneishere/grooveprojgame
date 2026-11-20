@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Grove House · First-person walkthrough</title>
+  <style>
+    :root{--cream:#eee7d5;--ink:#151713;--line:rgba(238,231,213,.24);--green:#aab795}
+    *{box-sizing:border-box} html,body{margin:0;height:100%;overflow:hidden;background:#101512;color:var(--cream);font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+    #scene{position:fixed;inset:0} canvas{display:block}
+    .hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:32px 36px 28px;z-index:2}
+    .brand{letter-spacing:.18em;text-transform:uppercase;font-size:11px;color:#d7d9c4;display:flex;gap:10px;align-items:center}.brand b{font-size:13px;color:#d8cfaa}.brand i{display:inline-block;width:5px;height:5px;background:#aebd7d;border-radius:50%}
+    .title{margin-top:6px;font-family:Georgia,serif;font-size:clamp(27px,4vw,52px);line-height:.95;text-shadow:0 2px 16px #0008}.subtitle{font-size:12px;letter-spacing:.08em;color:#c8cbbb;margin-top:10px}
+    .bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:20px}.help{padding:13px 16px;border:1px solid var(--line);background:#121711aa;backdrop-filter:blur(8px);font-size:11px;color:#d8dccd;letter-spacing:.05em}.help span{display:inline-grid;place-items:center;border:1px solid #c9d0bc88;border-radius:3px;min-width:23px;height:22px;margin:0 3px;color:#fff;font-weight:700}
+    .prompt{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:auto;cursor:pointer;transition:opacity .5s}.prompt.hidden{opacity:0;pointer-events:none}.prompt .dot{width:9px;height:9px;border:1px solid #fff;border-radius:50%;margin:0 auto 18px;box-shadow:0 0 18px #fff}.prompt strong{display:block;font-size:12px;letter-spacing:.2em;text-transform:uppercase}.prompt small{display:block;margin-top:8px;color:#d8ddcfb8;font-size:12px}
+    #crosshair{position:fixed;left:50%;top:50%;width:5px;height:5px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);z-index:3;opacity:.8;box-shadow:0 0 8px #000}
+    .tag{position:fixed;right:30px;bottom:28px;background:#11170fbb;border:1px solid var(--line);padding:10px 13px;font-size:11px;color:#d9decf;letter-spacing:.08em;z-index:2}.tag em{font-style:normal;color:#afc18f}
+    @media(max-width:700px){.hud{padding:20px}.bottom{align-items:flex-start;flex-direction:column}.tag{right:20px;bottom:20px}.help{font-size:10px}}
+  </style>
+</head>
+<body>
+  <div id="scene"></div><div id="crosshair"></div>
+  <div class="hud"><div><div class="brand"><i></i> GANTON · RESIDENTIAL WALK</div><div class="title">Grove House</div><div class="subtitle">A quiet place with a long memory</div></div><div class="bottom"><div class="help"><span>W</span><span>A</span><span>S</span><span>D</span> move&nbsp;&nbsp; <span>Mouse</span> look&nbsp;&nbsp; <span>Esc</span> release</div></div></div>
+  <div class="tag"><em>18°C</em> &nbsp; late afternoon</div>
+  <div id="prompt" class="prompt"><div class="dot"></div><strong>Click to enter</strong><small>Walk the property in first person</small></div>
+  <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+  <script type="module">
+    import * as THREE from 'three';
+    import {PointerLockControls} from 'three/addons/controls/PointerLockControls.js';
+
+    const scene=new THREE.Scene(); scene.background=new THREE.Color(0x9cabb0); scene.fog=new THREE.Fog(0x9cabb0,24,82);
+    const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.1,160); camera.position.set(0,1.72,13.2);
+    const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,1.6)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; document.querySelector('#scene').appendChild(renderer.domElement);
+    const controls=new PointerLockControls(camera,renderer.domElement); const prompt=document.querySelector('#prompt'); prompt.addEventListener('click',()=>controls.lock()); controls.addEventListener('lock',()=>prompt.classList.add('hidden')); controls.addEventListener('unlock',()=>prompt.classList.remove('hidden'));
+    const tex=(file,repeat=1)=>{const t=new THREE.TextureLoader().load('./assets/'+file);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(repeat,repeat);t.colorSpace=THREE.SRGBColorSpace;return t};
+    const plaster=tex('plaster.png',2.2), wood=tex('wood.png',3), rug=tex('rug.png',2), grass=tex('grass.png',7);
+    const mat=(color,map,rough=.85)=>new THREE.MeshStandardMaterial({color,map,roughness:rough,metalness:0});
+    const M={wall:mat(0x879080,plaster),cream:new THREE.MeshStandardMaterial({color:0xd8cbb1,roughness:.95}),wood:mat(0x68452e,wood),dark:mat(0x302319,wood),rug:mat(0x6e6250,rug),grass:mat(0x777952,grass),black:new THREE.MeshStandardMaterial({color:0x11100e,roughness:1}),glass:new THREE.MeshStandardMaterial({color:0x9eb9c0,transparent:true,opacity:.38,roughness:.2}),rust:new THREE.MeshStandardMaterial({color:0x3b2d23,roughness:.95})};
+    const colliders=[]; const box=(x,y,z,w,h,d,material,solid=true)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;scene.add(o);if(solid)colliders.push(new THREE.Box3().setFromObject(o));return o};
+    const cyl=(x,y,z,r,h,material)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,16),material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;scene.add(o);return o};
+    const trim=(x,y,z,w,h,d,material=M.cream)=>box(x,y,z,w,h,d,material,false);
+    // ground, walk, facade and shell
+    box(0,-.18,0,58,.3,58,M.grass,false); box(0,.01,10,4,.08,19,new THREE.MeshStandardMaterial({color:0x89867b,roughness:1}),false);
+    box(0,3.15,0,14,.28,12,M.dark,false); // roof plane
+    // house perimeter, cut by a front doorway
+    box(-6,1.6,-1,0.35,3.2,12,M.wall); box(6,1.6,-1,0.35,3.2,12,M.wall); box(0,3.05,-1,12,.3,12,M.wall); box(-3.6,1.6,-6.8,4.8,3.2,.35,M.wall); box(3.6,1.6,-6.8,4.8,3.2,.35,M.wall); box(0,3.05,-6.8,12,.3,.35,M.wall);
+    box(-4.5,.08,-1,3,.16,11,M.wood,false); box(2.2,.08,-1,7.3,.16,11,M.wood,false); box(0,.08,-7.35,13,.16,1,M.wood,false);
+    // room divider / hallway, open passage
+    box(-1.9,1.6,-1.8,.22,3.2,5.1,M.wall); box(1.9,1.6,-1.8,.22,3.2,5.1,M.wall);
+    // doorway front + door
+    box(0,1.5,-6.55,2.5,3,.18,M.dark); box(0,1.5,-6.41,1.65,2.7,.12,mat(0x3a4544,wood),false); box(0,2.95,-6.38,2.2,.16,.16,M.cream,false); box(0,.17,-6.72,2.5,.18,.75,M.cream,false);
+    // windows
+    function window(x,y,z,w,h,rot=0){const f=box(x,y,z,w,h,.12,M.cream,false); if(rot)f.rotation.y=rot; box(x,y,z,.07,h*.88,.16,M.dark,false); box(x,y,z,w*.88,.07,.16,M.dark,false); box(x,y,z,.04,h*.82,.18,M.glass,false);}
+    window(-5.82,1.8,-3.7,2.7,1.5); window(5.82,1.8,-3.4,2.7,1.5); window(3.7,1.8,-6.62,1.9,1.25);
+    // crown and base trims
+    for(const x of [-5.78,5.78]){trim(x,2.65,-.9,.2,.1,11,M.cream)} trim(0,.3,-6.6,11.8,.18,.18,M.dark,false);
+    // living room rug and furniture
+    box(0,.18,-2.5,5.8,.08,4.2,M.rug,false); box(0,.75,-2.9,2.8,.16,1.15,M.dark); for(const x of [-1.1,1.1]){box(x,.42,-2.9,.12,.65,.12,M.dark,false);box(x,.42,-1.95,.12,.65,.12,M.dark,false)}
+    function sofa(x,z,rot=0){const g=new THREE.Group();const seat=box(0,.7,0,2.6,.48,1.05,mat(0x4c3b2d,rug),false);const back=box(0,1.25,.43,2.6,.9,.28,mat(0x4c3b2d,rug),false);g.add(seat,back);g.position.set(x,0,z);g.rotation.y=rot;scene.add(g)} sofa(0,-4.5); sofa(-4.4,-3.2,Math.PI/2);
+    box(0,1.82,-.2,1.55,.09,.75,M.wood,false); box(0,1.42,-.2,.08,.8,.08,M.dark,false); box(0,1.42,-.2,-.01,.01,.01,M.dark,false);
+    // TV and console
+    box(4.8,1.18,-1.6,1.7,.2,.6,M.dark);box(4.8,2.05,-1.62,1.45,1.15,.13,M.black);box(4.8,2.05,-1.52,1.28,.92,.04,M.glass,false);
+    // bedroom left: bed, nightstands, picture
+    box(-4.4,.65,1.3,3.2,.38,4.3,M.dark);box(-4.4,1.18,3.15,3.2,1.3,.25,M.wood,false);box(-4.4,.88,.4,3.05,.12,3.55,mat(0xc8bda7,rug),false);box(-4.4,.98,-.5,3.05,.13,2.2,mat(0x916e46,rug),false);box(-4.4,1.12,-.55,1.2,.16,.65,mat(0xe1d4bd,rug),false);box(-3.25,.65,3.1,.7,1.2,.65,M.wood); box(-5.55,.65,3.1,.7,1.2,.65,M.wood); box(-4.4,2.2,3.0,1.35,1,.08,M.cream,false);
+    // decor props
+    cyl(-5.1,1.55,-4.4,.25,.85,mat(0xb8ab8c,rug)); for(let i=0;i<5;i++){const a=i*.9; cyl(-5.1+Math.cos(a)*.15,2.1,-4.4+Math.sin(a)*.15,.05,.95,mat(0x72552c,wood))}
+    // exterior porch, fence, bins, trees
+    box(0,.15,-8.05,8,.25,2,M.wood,false);box(-3.4,1.7,-8.25,.2,3.1,.2,M.dark);box(3.4,1.7,-8.25,.2,3.1,.2,M.dark);box(0,3.12,-8.25,7,.18,.25,M.dark,false);
+    for(const x of [-13,-10,-7,7,10,13]){box(x,1.0,2.8,.12,2,.12,M.rust,false);box(x,1.0,8.7,.12,2,.12,M.rust,false)} for(const z of [2.8,8.7]) for(let x=-13;x<=13;x+=.6)box(x,1,z,.025,1.5,.025,new THREE.MeshStandardMaterial({color:0x48504b,roughness:1}),false);
+    function tree(x,z,s=1){cyl(x,1.6,z,.22,3.2,mat(0x503b29,wood));const top=cyl(x,4.0,z,1.5*s,2.6*s,new THREE.MeshStandardMaterial({color:0x334d2d,roughness:1}));top.scale.y=1.2;top.castShadow=true} tree(-11,-2,1.1);tree(11,4,1.2);tree(-15,9,1.5);
+    box(10,.5,8,1.2,1,.8,M.dark);box(10,1.1,8,1,.12,.7,M.black,false);
+    // lighting
+    scene.add(new THREE.HemisphereLight(0xd9e1e4,0x3e2d21,1.7)); const sun=new THREE.DirectionalLight(0xffd7a3,3.0);sun.position.set(-8,15,12);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-35;sun.shadow.camera.right=35;sun.shadow.camera.top=35;sun.shadow.camera.bottom=-35;scene.add(sun);
+    const lamp=new THREE.PointLight(0xffb878,2.6,10);lamp.position.set(0,2.6,-2.5);lamp.castShadow=true;scene.add(lamp); const lamp2=new THREE.PointLight(0xffcf9c,1.8,9);lamp2.position.set(-4,2.5,1.6);lamp2.castShadow=true;scene.add(lamp2);
+    const keys={}; addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>keys[e.code]=false); addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+    const player=new THREE.Vector3(); function blocked(p){const r=.42;return colliders.some(b=>p.x>b.min.x-r&&p.x<b.max.x+r&&p.z>b.min.z-r&&p.z<b.max.z+r&&p.y>b.min.y-.2&&p.y<b.max.y+.4)}
+    let last=performance.now();function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;if(controls.isLocked){const speed=4.1;const dir=new THREE.Vector3((keys.KeyD?1:0)-(keys.KeyA?1:0),0,(keys.KeyS?1:0)-(keys.KeyW?1:0));if(dir.lengthSq())dir.normalize();const forward=new THREE.Vector3();camera.getWorldDirection(forward);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();const move=forward.multiplyScalar(-dir.z*speed*dt).add(right.multiplyScalar(dir.x*speed*dt));const next=camera.position.clone().add(move);next.y=1.72;if(!blocked(next)){camera.position.copy(next)}camera.position.x=THREE.MathUtils.clamp(camera.position.x,-27,27);camera.position.z=THREE.MathUtils.clamp(camera.position.z,-18,27)}renderer.render(scene,camera)}requestAnimationFrame(animate);
+  </script>
+</body></html>
