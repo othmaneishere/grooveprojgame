@@ -131,7 +131,9 @@ export function createLighting(scene,renderer,world,profile='balanced'){
   }
 
   const mirrorMeshes=[];
+  const reflections=new Map();
   scene.traverse(o=>{
+    if(o.isMesh&&Number.isFinite(o.material?.envMapIntensity))reflections.set(o.material,o.material.envMapIntensity);
     if(!o.userData.mirror)return;
     if(!floatTargets)o.getRenderTarget().texture.type=T.UnsignedByteType;
     mirrorMeshes.push(o);
@@ -180,7 +182,7 @@ export function createLighting(scene,renderer,world,profile='balanced'){
   }
   const cull=createRoomCuller(world,redrawVisibleShadows);
   let lastRoom='',dayKey='',warmSource=null,warmTarget=null,elapsed=0,nextRanking=0,nextShadow=0,warmLevel=0;
-  let evening=0,lightGoal=0;
+  let evening=0,lightGoal=0,powered=true;
   const dusk=new T.Color(0x91aadd),glassDay=new T.Color(0xdbebff),glassDusk=new T.Color(0x96abd0);
   function setProfile(mode){
     profile=mode in lightingProfiles?mode:'balanced';
@@ -218,13 +220,14 @@ export function createLighting(scene,renderer,world,profile='balanced'){
     const rate=snap?1:1-Math.exp(-dt*10.2);
     cull(zone,camera);
     evening=T.MathUtils.lerp(evening,lightGoal,snap?1:1-Math.exp(-dt*2.7));
-    const daylight=T.MathUtils.lerp(1,.23,evening);
-    hemi.intensity=T.MathUtils.lerp(.74,.50,evening);
-    world.glazing.emissiveIntensity=T.MathUtils.lerp(1.12,.23,evening);
-    world.glazing.emissive.copy(glassDay).lerp(glassDusk,evening);
-    renderer.toneMappingExposure=T.MathUtils.lerp(1.09,1.20,evening);
+    const lightRate=powered?rate:1;
+    const daylight=powered?T.MathUtils.lerp(1,.23,evening):.028;
+    hemi.intensity=powered?T.MathUtils.lerp(.74,.50,evening):.093;
+    world.glazing.emissiveIntensity=powered?T.MathUtils.lerp(1.12,.23,evening):.038;
+    world.glazing.emissive.copy(glassDay).lerp(glassDusk,powered?evening:1);
+    renderer.toneMappingExposure=powered?T.MathUtils.lerp(1.09,1.20,evening):1.25;
     const main=daylightFor(zone,position);
-    drift(dt,main,!steady&&profile!=='performance',daylight,renderer.getPixelRatio(),snap);
+    drift(dt,main,powered&&!steady&&profile!=='performance',daylight,renderer.getPixelRatio(),snap);
     if(main.key!==dayKey||snap){
       dayKey=main.key;
       const assigned=windows.find(w=>w.key===main.key)??windows.reduce((a,b)=>a.light.intensity<b.light.intensity?a:b);
@@ -240,7 +243,7 @@ export function createLighting(scene,renderer,world,profile='balanced'){
       }
     }
     for(const entry of windows){
-      const value=T.MathUtils.lerp(entry.light.intensity,entry.target*daylight,snap?1:1-Math.exp(-dt*9));
+      const value=T.MathUtils.lerp(entry.light.intensity,entry.target*daylight,snap||!powered?1:1-Math.exp(-dt*9));
       entry.light.intensity=value<.02?0:value;
       entry.light.color.copy(entry.dayColor).lerp(dusk,evening);
     }
@@ -259,9 +262,9 @@ export function createLighting(scene,renderer,world,profile='balanced'){
         }
       }
       const source=slot.source;
-      const target=source&&source===slot.next&&source.enabled
+      const target=powered&&source&&source===slot.next&&source.enabled
         ? sourceStrength(source,position,zone)*(source.pulse??1)*(source.kind==='window'?daylight:1+evening*.13):0;
-      slot.light.intensity=T.MathUtils.lerp(slot.light.intensity,target,rate);
+      slot.light.intensity=T.MathUtils.lerp(slot.light.intensity,target,lightRate);
     }
     if(warmTarget!==warmSource && (snap||warmLevel<2.2)){
       warmSource=warmTarget;
@@ -274,10 +277,10 @@ export function createLighting(scene,renderer,world,profile='balanced'){
         redrawShadow(ceiling);
       }
     }
-    warmLevel=T.MathUtils.lerp(warmLevel,warmSource===warmTarget&&warmSource?.enabled?36:0,rate);
+    warmLevel=T.MathUtils.lerp(warmLevel,powered&&warmSource===warmTarget&&warmSource?.enabled?36:0,lightRate);
     ceiling.intensity=warmLevel;
     for(const {source,material,lit,unlit} of world.fixtures){
-      material.emissiveIntensity=T.MathUtils.lerp(material.emissiveIntensity,source.enabled?lit:unlit,rate);
+      material.emissiveIntensity=T.MathUtils.lerp(material.emissiveIntensity,powered?(source.enabled?lit:unlit):0,lightRate);
     }
     if(elapsed>=nextShadow){
       for(let i=0;i<world.doors.length;i++){
@@ -302,7 +305,13 @@ export function createLighting(scene,renderer,world,profile='balanced'){
     apertures.dispose();
     for(const spot of spots)spot.shadow.dispose();
   }
-  return {update,setProfile,dispose,setAtmosphere(mode){
+  return {update,setProfile,dispose,setPower(on){
+    powered=on;
+    world.bulbs.emissiveIntensity=on?.68:0;
+    for(const [material,value] of reflections)material.envMapIntensity=value*(on?1:.076);
+    for(const source of world.sources)source.blackout=!on;
+    for(const mirror of mirrorMeshes)mirror.userData.reflectionDirty=true;
+  },setAtmosphere(mode){
     lightGoal=mode==='evening'?1:0;
     for(const mirror of mirrorMeshes)mirror.userData.reflectionDirty=true;
   }};

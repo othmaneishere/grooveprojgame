@@ -6,6 +6,7 @@ import { pickInteraction,occludedByHouse } from './interactions.js';
 import { HouseAudio } from './house-audio.js';
 import { createLighting,lightingProfiles } from './lighting.js';
 import { createImagePipeline } from './image-pipeline.js';
+import { createBlackoutState,lighterModel } from './blackout.js';
 
 const el=id=>document.getElementById(id);
 const menu=el('menu'),enter=el('enter'),status=el('status');
@@ -71,6 +72,15 @@ async function boot(){
     return moving.length?[...indexed,...moving]:indexed;
   };
   const lighting=createLighting(scene,renderer,world,preferred());
+  const blackout=createBlackoutState();
+  const {state}=blackout;
+  const pickup=props.find(prop=>prop.kind==='lighter');
+  const held=lighterModel(world.lighterFinish);
+  held.position.set(.23,-.238,-.48);held.rotation.set(-.08,-.29,.08);held.scale.setScalar(2);
+  held.visible=false;camera.add(held);scene.add(camera);
+  const flameLight=new T.PointLight(0xffa355,0,4.3,2);
+  flameLight.position.set(.17,-.066,-.52);camera.add(flameLight);
+  let sitting=null,flameAge=0;
   lighting.setAtmosphere(settings.atmosphere);
   const pipeline=createImagePipeline(renderer,camera);
   const render=()=>pipeline.render(scene,preferred()==='high');
@@ -78,6 +88,7 @@ async function boot(){
   const footstep=(surface,left,effort)=>audio.footstep(surface,left,effort);
   const interaction=el('interaction'),prompt=interaction.querySelector('span');
   const touchUse=el('touch-use'),ledger=el('ledger');
+  const touchSit=el('touch-sit'),touchLighter=el('touch-lighter'),lighterStatus=el('lighter-status');
   const lookHint=el('look-hint');
 
   function cameraPose(){
@@ -106,10 +117,12 @@ async function boot(){
     audio.setActive(active);
     if(active){
       started=true;playAge=0;cameraPose();enter.blur();
+      updatePropHud();
     }else{
       clearInput();
       interaction.hidden=true;el('reticle').dataset.ready='false';currentTarget=null;
       lookHint.hidden=true;
+      lighterStatus.hidden=true;
       el('links').hidden=!started;
       enter.textContent=started?'Resume exploring':'Explore the house';
       if(started)status.textContent='Walkthrough paused';
@@ -133,12 +146,60 @@ async function boot(){
   function playAt(kind,position,power){
     if(kind)audio.event(kind,position,power);
   }
+  function updatePropHud(){
+    touchLighter.hidden=!state.collected;
+    touchLighter.textContent=state.lit?'Close lighter':'Light';
+    lighterStatus.hidden=!playing||state.power&&!state.collected;
+    const message=state.collected?(touch?'Brass lighter':state.lit?'F · Close lighter':'F · Light lighter'):
+      'Power is out. Find a lighter in the kitchen.';
+    if(lighterStatus.textContent!==message)lighterStatus.textContent=message;
+  }
+  function toggleLighter(){
+    if(!playing||!state.collected)return;
+    const lit=blackout.toggle();
+    playAt(lit?'strike':'handle',null,.51);
+    updatePropHud();
+  }
+  function standFromToilet(){
+    blackout.stand();
+    Object.assign(player,sitting.position);
+    yaw=sitting.yaw;pitch=sitting.pitch;
+    sitting=null;motion=createMotion(player.y);cameraPose();
+  }
+  function sitOnToilet(){
+    if(!playing||state.seated)return;
+    updatePrompt();
+    if(currentTarget?.kind!=='toilet')return;
+    const toilet=currentTarget;
+    toilet.cancel();
+    sitting={position:{...player},yaw,pitch};
+    const first=blackout.sit();
+    clearInput();
+    player.x=toilet.seat.x;player.z=toilet.seat.z;
+    motion=createMotion(player.y);motion.eye=toilet.seat.y;
+    yaw=0;pitch=-.035;cameraPose();
+    if(first){
+      lighting.setPower(false);
+      audio.impactHit();
+    }
+    updatePropHud();updatePrompt();
+  }
   function useTarget(){
     if(!playing)return;
+    if(state.seated){standFromToilet();updatePrompt();return;}
     updatePrompt();
     const target=currentTarget;
     if(!target)return;
-    if(target.kind==='door'){
+    if(target.requiresPower&&!state.power){
+      playAt('switch',target.point.toArray(),.29);
+    }else if(target.kind==='lighter'){
+      if(blackout.collect()){
+        target.setCollected(true);
+        held.visible=true;
+        playAt('ceramic',null,.31);
+        updatePropHud();
+      }
+    }else if(target.kind==='door'){
       target.target=target.target===0?target.openAngle:0;
       target.handleTime=.36;
       target.wasMoving=false;
@@ -155,6 +216,8 @@ async function boot(){
     updatePrompt();
   }
   function reset(){
+    blackout.reset();lighting.setPower(true);sitting=null;flameLight.intensity=0;held.visible=false;
+    held.userData.update(1,false,true);pickup.setCollected(false);
     Object.assign(player,SPAWN);
     yaw=SPAWN.yaw;pitch=0;motion=createMotion(player.y);crouched=false;
     player.height=motion.height;
@@ -207,6 +270,8 @@ async function boot(){
   el('reset').addEventListener('click',reset);
   el('pause').addEventListener('click',stop);
   touchUse.addEventListener('click',useTarget);
+  touchSit.addEventListener('click',sitOnToilet);
+  touchLighter.addEventListener('click',toggleLighter);
   el('touch-crouch').addEventListener('click',e=>{
     crouched=!crouched;e.currentTarget.setAttribute('aria-pressed',String(crouched));
   });
@@ -266,6 +331,8 @@ async function boot(){
     if(!playing)return;
     if(movement.has(e.code)){e.preventDefault();keys.add(e.code);}
     if(e.code==='KeyE'&&!e.repeat)useTarget();
+    if(e.code==='KeyX'&&!e.repeat)sitOnToilet();
+    if(e.code==='KeyF'&&!e.repeat)toggleLighter();
     if(e.code==='Escape')stop();
   });
   addEventListener('keyup',e=>keys.delete(e.code));
@@ -284,15 +351,22 @@ async function boot(){
   function updatePrompt(){
     if(!playing)return;
     camera.getWorldPosition(mouth);camera.getWorldDirection(forward);
-    currentTarget=pickInteraction(mouth,forward,sceneSolids,doors,props);
-    const active=Boolean(currentTarget);
+    currentTarget=state.seated?null:pickInteraction(mouth,forward,sceneSolids,doors,props);
+    const active=state.seated||Boolean(currentTarget);
     if(interaction.hidden===active)interaction.hidden=!active;
     el('reticle').dataset.ready=String(active);
     if(active){
-      const line=currentTarget.kind==='door'?(currentTarget.target===0?'Open door':'Close door'):currentTarget.label();
+      let line=state.seated?'Stand up':currentTarget.kind==='door'?
+        (currentTarget.target===0?'Open door':'Close door'):currentTarget.label();
+      if(currentTarget?.kind==='toilet'&&!touch)line+=' · X — Sit down';
+      if(currentTarget?.requiresPower&&!state.power)line='No power';
       if(prompt.textContent!==line)prompt.textContent=line;
     }
-    if(touch)touchUse.disabled=!active;
+    if(touch){
+      touchUse.disabled=!active;
+      touchUse.textContent=state.seated?'Stand':currentTarget?.kind==='toilet'?'Pee':'Use';
+      touchSit.hidden=currentTarget?.kind!=='toilet';
+    }
   }
   function updateDoors(dt){
     for(const door of doors){
@@ -354,10 +428,13 @@ async function boot(){
       readInput(dt);accumulator+=dt;
       while(accumulator>=STEP){
         updateDoors(STEP);
-        stepMotion(player,motion,input,STEP,collision,doors,footstep);
+        if(!state.seated)stepMotion(player,motion,input,STEP,collision,doors,footstep);
         accumulator-=STEP;
       }
       for(const update of updates)update(dt,settings.steady,player);
+      flameAge+=dt;
+      held.userData.update(dt,state.lit,settings.steady);
+      flameLight.intensity=state.lit?22*(settings.steady?1:1+Math.sin(flameAge*17)*.07+Math.sin(flameAge*27)*.029):0;
       cameraPose();
       const room=updatePlace();
       lighting.update(dt,player,room,false,settings.steady,camera);

@@ -15,11 +15,13 @@
   <div id="reticle" hidden aria-hidden="true"></div>
   <div id="look-hint" hidden>Drag to look around</div>
   <div id="interaction" hidden><kbd>E</kbd> <span></span></div>
+  <div id="lighter-status" role="status" hidden></div>
   <aside id="location" hidden><span id="storey"></span><h2 id="room"></h2></aside>
   <button id="pause" hidden aria-label="Pause">Ⅱ</button>
   <div id="touch" hidden aria-label="Touch controls">
     <div id="stick"></div><button id="touch-crouch" aria-pressed="false">Crouch</button>
     <button id="touch-use" aria-label="Interact">Use</button>
+    <button id="touch-sit" hidden>Sit</button><button id="touch-lighter" hidden>Light</button>
   </div>
   <section id="menu" aria-labelledby="title">
     <div class="plate">
@@ -28,7 +30,7 @@
       <p id="status" role="status">Preparing the house…</p>
       <button id="enter" disabled>Explore the house</button>
       <div id="keys"><kbd>W A S D</kbd> Walk <kbd>Mouse</kbd> Look <kbd>E</kbd> Interact
-        <kbd>Shift</kbd> Quick walk <kbd>C</kbd> Crouch <kbd>Esc</kbd> Pause</div>
+        <kbd>Shift</kbd> Quick walk <kbd>C</kbd> Crouch <kbd>F</kbd> Lighter <kbd>Esc</kbd> Pause</div>
       <details id="settings">
         <summary>Settings</summary>
         <div class="settings-grid">

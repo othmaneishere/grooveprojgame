@@ -65,15 +65,16 @@ export function hearthFlame(parent,kit,source,room){
   let warm=.72,elapsed=0;
   updates.push((dt,steady)=>{
     elapsed+=dt;
-    warm=T.MathUtils.damp(warm,source.enabled?.86:0,4.6,dt);
+    warm=source.blackout?0:T.MathUtils.damp(warm,source.enabled?.86:0,4.6,dt);
     const flutter=steady?1:1+Math.sin(elapsed*9.2)*.12+Math.sin(elapsed*15.1)*.042;
     source.pulse=flutter;
     flame.visible=warm>.015;
     flame.material.uniforms.clock.value=steady?1.38:elapsed+1.38;
     flame.material.uniforms.strength.value=warm;
-    emberMat.emissiveIntensity=.10+warm*1.38;
+    emberMat.emissiveIntensity=source.blackout?0:.10+warm*1.38;
   });
   addProp(parent,[0,.48,.36],{
+    requiresPower:true,
     radius:.41,
     label:()=>source.enabled?'Dampen the fire':'Stoke the fire',
     use(){source.enabled=!source.enabled;return 'wick';},

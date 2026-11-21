@@ -153,43 +153,6 @@ export async function buildHouse(scene,{onProgress=()=>{}}={}) {
     });
     return mesh(parent,geometry,material,x,y,z);
   }
-  function welt(parent,x,y,z,w,d,r,material){
-    const key='welt'+[w,d,r];
-    const geometry=shape(key,()=>{
-      const points=[];
-      for(let i=0;i<36;i++){
-        const a=(2*Math.PI*i)/36;
-        points.push(new T.Vector3(softPower(Math.cos(a),.56)*w/2,0,softPower(Math.sin(a),.56)*d/2));
-      }
-      return new T.TubeGeometry(new T.CatmullRomCurve3(points,true),48,r,5,true);
-    });
-    return mesh(parent,geometry,material,x,y,z);
-  }
-  const quiltMaterials=new Map();
-  function quilt(parent,x,y,z,w,d,material,phase=0){
-    const key='quilt'+[w,d,phase];
-    const geometry=shape(key,()=>{
-      const g=new T.PlaneGeometry(w,d,32,28);
-      g.rotateX(-Math.PI/2);
-      const {position,uv}=g.attributes;
-      for(let i=0;i<position.count;i++){
-        const u=uv.getX(i),v=uv.getY(i);
-        const side=T.MathUtils.smoothstep(Math.abs(u-.5),.42,.50);
-        const end=T.MathUtils.smoothstep(1-v,.87,1);
-        const crease=(Math.sin(u*39+v*11+phase)*.0035+Math.sin(u*68-v*16)*.0018)*(.45+side*.60);
-        const height=.015*Math.sin(u*Math.PI)*Math.sin(v*Math.PI)-side*.081-end*.053+crease;
-        position.setY(i,height);
-        uv.setXY(i,u*1.6,v*1.4);
-      }
-      g.computeVertexNormals();
-      return g;
-    });
-    if(!quiltMaterials.has(material)){
-      const double=material.clone();
-      double.side=T.DoubleSide;quiltMaterials.set(material,double);
-    }
-    return mesh(parent,geometry,quiltMaterials.get(material),x,y,z);
-  }
   function lathe(parent,x,y,z,profile,material,segments=18){
     const key='lathe'+segments+JSON.stringify(profile);
     return mesh(parent,shape(key,()=>new T.LatheGeometry(profile.map(p=>new T.Vector2(...p)),segments)),material,x,y,z);
@@ -474,13 +437,14 @@ export async function buildHouse(scene,{onProgress=()=>{}}={}) {
       rocker.quaternion.copy(rpm).multiply(tilt.setFromAxisAngle(axis,amount));
     });
     return addProp(mount,[0,.01,.053],{
+      requiresPower:true,
       radius:.155,label:()=>source.enabled?'Switch lights off':'Switch lights on',
       use(){source.enabled=!source.enabled;return 'switch';},
       reset(){source.enabled=true;},
     });
   }
 
-  const kit={m,furniture,paint,group,box,block,oval,puff,welt,quilt,disc,cylinder,lathe,round,point,frame,shade,
+  const kit={m,furniture,paint,group,box,block,oval,puff,disc,cylinder,lathe,round,point,frame,shade,
     updates,sources,fixtures,sounds,dynamicSolids,bounds,worldPoint,moveable,addProp};
   for(const room of rooms){
     const {side,front,level,color}=room;
@@ -610,5 +574,6 @@ export async function buildHouse(scene,{onProgress=()=>{}}={}) {
   const movingShapes=new Set();
   movingRoot.traverse(o=>{if(o.isMesh)movingShapes.add(o.geometry);});
   for(const g of shapes.values())if(!movingShapes.has(g))g.dispose();
-  return {solids,dynamicSolids,doors,props,updates,sources,fixtures,sounds,roomMeshes,glazing:m.glass};
+  return {solids,dynamicSolids,doors,props,updates,sources,fixtures,sounds,roomMeshes,
+    glazing:m.glass,bulbs:m.glow,lighterFinish:furniture['satin-brass']};
 }

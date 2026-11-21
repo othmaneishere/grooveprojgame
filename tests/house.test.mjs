@@ -14,6 +14,18 @@ const {rooms,LEVEL,SPAWN,BODY,doorHits,movePlayer,locationAt,advanceDoor,indexSo
 const {pickInteraction,occludedByHouse}=await import('../dist/interactions.js');
 const {createRoomCuller}=await import('../dist/lighting.js');
 const {surfaceChannels}=await import('../dist/surface-detail.js');
+const {createBlackoutState}=await import('../dist/blackout.js');
+const bathroomStory=createBlackoutState();
+assert.equal(bathroomStory.toggle(),false,'The lighter cannot ignite before it is collected');
+assert.equal(bathroomStory.sit(),true,'First sitting interaction triggers the scare');
+assert.equal(bathroomStory.state.power,false);
+bathroomStory.stand();
+assert.equal(bathroomStory.sit(),false,'Sitting again does not replay the scare');
+assert.equal(bathroomStory.collect(),true);
+assert.equal(bathroomStory.toggle(),true);
+assert.equal(bathroomStory.toggle(),false);
+bathroomStory.reset();
+assert.deepEqual(bathroomStory.state,{power:true,seated:false,collected:false,lit:false});
 const scene=new T.Scene();
 const world=await buildHouse(scene);
 const {solids,dynamicSolids,doors,props,updates,sounds,roomMeshes}=world;

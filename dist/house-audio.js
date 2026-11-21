@@ -27,7 +27,8 @@ function envelope(t,attack,decay){
 export function synthesize(kind, seed=1, rate=HZ){
   const random=randomSource(seed);
   const durations={hinge:.90,latch:.26,handle:.21,switch:.14,drawer:.49,fire:7.1,wind:10,
-    tick:.15,clock:.31,wick:.19,page:.43,ceramic:.23,water:4.2,chair:.72,creak:.43};
+    tick:.15,clock:.31,wick:.19,page:.43,ceramic:.23,water:4.2,chair:.72,creak:.43,
+    'toilet-water':2.6,strike:.34};
   const surface=surfaces[kind];
   const duration=surface ? .24 : (durations[kind]??.22);
   const looping=kind==='fire'||kind==='wind'||kind==='water';
@@ -91,11 +92,17 @@ export function synthesize(kind, seed=1, rate=HZ){
         sample=drift*(deep*.69+low*.05);
         break;
       }
-      case 'water':{
+      case 'water':
+      case 'toilet-water':{
         const bubble=.66+.21*Math.sin(t*17.73+deep*12)+.075*Math.sin(t*31.64);
         sample=(noise-low*.73)*bubble*.14+low*.21+deep*.11;
+        if(kind==='toilet-water')sample*=Math.min(1,t*10,(duration-t)*5);
         break;
       }
+      case 'strike':
+        sample=envelope(t,.0015,.034)*(noise*.61+low*.22)+
+          envelope(t-.078,.007,.042)*(noise*.14+low*.30);
+        break;
       case 'tick':
         sample=envelope(t,.0006,.017)*(noise*.23+Math.sin(TAU*(seed%2?1055:809)*t)*.31);
         break;
@@ -168,6 +175,11 @@ export class HouseAudio {
     this.nextTick=0;
     this.pauseTimer=0;
     this.stairSteps=0;
+    this.impactData=fetch(new URL('./assets/audio/blackout-impact.mp3',import.meta.url))
+      .then(response=>{
+        if(!response.ok)throw new Error('Blackout effect failed to load');
+        return response.arrayBuffer();
+      }).catch(()=>null);
   }
   unlock(){
     if(this.context){this.context.resume().catch(()=>{});return;}
@@ -175,6 +187,7 @@ export class HouseAudio {
     if(!Audio)return;
     const context=new Audio({latencyHint:'interactive'});
     this.context=context;
+    this.impact=this.impactData.then(data=>data?context.decodeAudioData(data):null).catch(()=>null);
     this.output=context.createGain();
     this.output.gain.value=0;
     const compressor=context.createDynamicsCompressor();
@@ -252,6 +265,22 @@ export class HouseAudio {
     spatial.connect(this.output);spatial.connect(this.wet);
     sound.onended=()=>{sound.disconnect();gain.disconnect();spatial.disconnect();};
     sound.start();
+  }
+  impactHit(){
+    if(!this.context || !this.impact)return;
+    this.impact.then(buffer=>{
+      if(!buffer||!this.active||!this.volume)return;
+      this.impactSource?.stop();
+      const source=this.context.createBufferSource(),gain=this.context.createGain();
+      source.buffer=buffer;gain.gain.value=3.0;
+      source.connect(gain).connect(this.output);
+      this.impactSource=source;
+      source.onended=()=>{
+        if(this.impactSource===source)this.impactSource=null;
+        source.disconnect();gain.disconnect();
+      };
+      source.start();
+    });
   }
   footstep(surface,left,effort){
     this.event(surface,null,.48*clamp(effort,.20,1.24),left?-.13:.13);

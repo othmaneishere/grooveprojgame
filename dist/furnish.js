@@ -1,9 +1,11 @@
 import * as T from 'three';
 import { overlaps } from './layout.js';
+import { modelBed,modelSettee,modelSideChair } from './furniture-models.js';
+import { lighterModel } from './blackout.js';
 import { hearthFlame,wallMirror,waterTap } from './room-effects.js';
 
 export function furnish(k,root,room){
-  const {m,furniture:f,box,block,round,oval,puff,welt,quilt,disc,cylinder,lathe,group,shade,frame,paint,point,
+  const {m,furniture:f,box,block,round,oval,puff,disc,cylinder,lathe,group,shade,frame,paint,point,
     moveable,addProp,worldPoint,updates,fixtures,sources,sounds,dynamicSolids,bounds}=k;
   const PI=Math.PI;
   function feet(g,w,d,h=.16,finish=f['smoked-walnut']){
@@ -105,6 +107,7 @@ export function furnish(k,root,room){
     const light=point(at.x,at.y,at.z,0xffc389,3.1,3.45,'lamp',room.name);
     fixtures.push({material:shade,source:light,lit:.77,unlit:.015});
     addProp(p,[0,.61,0],{
+      requiresPower:true,
       radius:.26,label:()=>light.enabled?'Turn lamp off':'Turn lamp on',
       use(){light.enabled=!light.enabled;return 'switch';},
       reset(){light.enabled=true;},
@@ -165,27 +168,8 @@ export function furnish(k,root,room){
   }
   function sofa(x,z,w,angle,fabric,pillows=[]){
     const g=group(root,x,0,z,angle);
-    feet(g,w-.29,.62,.15);
-    round(g,0,.27,0,w,.25,.83,.10,fabric);
-    const back=round(g,0,.64,-.33,w-.10,.71,.245,.13,fabric);back.rotation.x=-.09;
-    for(const s of [-1,1]){
-      puff(g,s*(w/2-.09),.624,.035,.275,.262,.858,fabric,.55);
-      round(g,s*(w/2-.10),.43,.04,.19,.25,.75,.07,fabric);
-    }
-    const n=w>1.8?3:1, cw=(w-.41)/n;
-    for(let i=0;i<n;i++){
-      const cx=(i-(n-1)/2)*cw;
-      puff(g,cx,.465,.075,cw-.017,.152,.656,fabric,.42);
-      welt(g,cx,.466,.075,cw-.018,.655,.004,fabric);
-      const upright=puff(g,cx,.717,-.218,cw-.028,.475,.190,fabric,.49);
-      upright.rotation.x=-.17;
-      for(const off of [-.24,.24])oval(g,cx+off*cw,.772,-.182,.011,.011,.012,fabric);
-    }
-    for(let i=0;i<pillows.length;i++){
-      const side=i===0?-1:1;
-      const cushion=puff(g,pillows.length===1?0:side*(w/2-.40),.676,-.046,.37,.37,.138,pillows[i],.57);
-      cushion.rotation.set(-.28,side*.10,side*.20);
-    }
+    const style=fabric===f['cognac-leather']?'chesterfield':room.level===1?'tailored':'rolled';
+    modelSettee(g,k,w,fabric,pillows,style);
     block(g,0,.51,.013,w+.094,1.02,.91);
     shade(g,0,.04,w+.44,1.30,.035);
   }
@@ -294,7 +278,7 @@ export function furnish(k,root,room){
     const light=point(xw+Math.sin(yaw)*.54,yw+.46,zw+Math.cos(yaw)*.54,0xff9a56,8.5,3.0,'fire',room.name);
     hearthFlame(g,k,light,room.name);
     sounds.push({kind:'fire',position:[light.x,light.y,light.z],room:room.name,
-      volume:room.name==='Drawing room'?.26:.22,enabled:()=>light.enabled});
+      volume:room.name==='Drawing room'?.26:.22,enabled:()=>light.enabled&&!light.blackout});
     round(g,0,1.287,.447,1.67,.075,.018,.010,m.carved);
   }
   function mantleClock(parent){
@@ -376,28 +360,13 @@ export function furnish(k,root,room){
   }
   function bed(x,z,principal){
     const g=group(root,x,0,z);
-    const wood=f[principal?'mahogany':'limed-ash'];
-    const head=f[principal?'forest-velvet':'taupe-pinstripe'];
-    const bedding=f[principal?'sage-wool':'rose-linen'];
-    feet(g,1.55,1.91,.15,wood);
-    round(g,0,.29,0,1.78,.31,2.16,.09,wood);
-    round(g,0,.344,1.082,1.57,.144,.018,.060,f[principal?'burr-walnut':'honey-oak']);
-    round(g,0,.89,-1.05,1.79,1.03,.16,.23,wood);
-    round(g,0,.94,-.944,1.58,.72,.11,.23,head);
-    for(let i=0;i<7;i++)oval(g,(i-3)*.18,.98,-.861,.012,.012,.012,head);
-    round(g,0,.51,.015,1.76,.23,2.08,.10,f['cotton-percale']);
-    quilt(g,0,.658,.35,1.83,1.40,bedding,principal?.4:2.8);
-    round(g,0,.688,-.18,1.71,.083,.23,.040,f['ivory-damask']);
-    quilt(g,0,.691,.82,1.87,.44,f[principal?'navy-windowpane':'sand-quilt'],1.5);
-    for(const s of [-1,1]){
-      const pillow=puff(g,s*.43,.713,-.638,.67,.175,.46,f[principal?'ivory-damask':'cotton-percale'],.47);
-      pillow.rotation.x=.16;
-      const deco=puff(g,s*.40,.755,-.389,.33,.151,.28,f[principal?'iberian-weave':'clay-jacquard'],.51);
-      deco.rotation.y=s*.19;
-      const t=console(x+s*1.25,z-.77,.60);
+    modelBed(g,k,principal);
+    for(const side of [-1,1]){
+      const t=console(x+side*1.25,z-.77,.60);
       lamp(t,0,.85,-.05,.69);
     }
-    block(g,0,.45,0,1.81,.92,2.20);
+    block(g,0,.45,0,1.86,.92,2.24);
+    block(g,0,1.12,-1.044,1.79,.79,.139);
     shade(g,0,.04,2.27,2.45,.036);
   }
   function cupboard(x,z,w,yaw=0){
@@ -412,14 +381,9 @@ export function furnish(k,root,room){
   }
   function seat(x,z,yaw=0,fabric=f['moss-tartan'],adjustable=false){
     const g=group(root,x,0,z,yaw);
-    const wood=f['quarter-sawn-oak'];
-    feet(g,.40,.39,.44,wood);
-    round(g,0,.395,0,.48,.078,.47,.040,wood);
-    round(g,0,.463,0,.49,.089,.47,.044,fabric);
-    for(const s of [-1,1])cylinder(g,s*.188,.71,-.195,.023,.50,wood);
-    round(g,0,.89,-.196,.47,.21,.055,.065,f['burr-walnut']);
-    for(const x of [-.09,0,.09])round(g,x,.70,-.191,.028,.21,.029,.013,wood);
-    if(!adjustable){block(g,0,.50,0,.49,1,.49);return;}
+    const footprint=[0,.51,0,.49,1.02,.49];
+    modelSideChair(g,k,fabric,room.name==='Reading room');
+    if(!adjustable){block(g,...footprint);return;}
     const prop=addProp(g,[0,.654,-.14],{
       radius:.32,label:()=>target?'Tuck chair in':'Pull chair out',
       use(){target=target?0:.29;return 'chair';},
@@ -431,7 +395,7 @@ export function furnish(k,root,room){
     moveable(g);
     const home=g.position.clone(),mark=prop.point.clone();
     const pull=new T.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
-    const base=bounds(g,0,.50,0,.49,1,.49);
+    const base=bounds(g,...footprint);
     const body={...base,enabled:true,moving:true};
     dynamicSolids.push(body);
     let travel=0,speed=0,target=0;
@@ -596,6 +560,18 @@ export function furnish(k,root,room){
     case 'Kitchen':{
       cabinetry();
       const t=table(.57,.11,1.00,1.63,.96,0,m.stone);
+      const holder=group(t,-.163,.964,.327,-.24);
+      const lighter=lighterModel(f['satin-brass']);
+      lighter.rotation.x=-Math.PI/2;
+      lighter.position.set(0,.012,.025);
+      holder.add(lighter);
+      moveable(holder);
+      addProp(t,[-.163,1.005,.327],{
+        kind:'lighter',radius:.14,label:()=> 'Pick up brass lighter',
+        use:()=> 'lighter-pickup',
+        setCollected(collected){lighter.visible=!collected;this.enabled=!collected;},
+        reset(){this.setCollected(false);},
+      });
       box(t,0,.45,0,.83,.79,1.43,f['olive-painted-oak']);
       box(t,-.13,.974,-.33,.44,.029,.29,f['aged-oak']);
       for(let i=0;i<5;i++)oval(t,.22+Math.sin(i*2.4)*.10,1.02,.30+Math.cos(i*2.4)*.15,.053,.047,.055,i%2?m.rust:m.green);
@@ -668,9 +644,35 @@ export function furnish(k,root,room){
       oval(sink,-.441,.862,.088,.062,.019,.048,m.ceramic);
       puff(sink,-.443,.884,.089,.099,.047,.078,m.porcelain,.47);
       box(root,.90,.85,2.78,.55,.5,.23,m.porcelain);
-      oval(root,.90,.38,2.48,.265,.22,.33,m.porcelain);
-      oval(root,.90,.56,2.44,.268,.057,.31,m.stone);
-      cylinder(root,.90,.18,2.56,.125,.33,m.porcelain);
+      const toilet=group(root,.90,0,2.46);
+      lathe(toilet,0,.27,0,[[0,0],[.144,0],[.168,.048],[.224,.121],[.243,.217],
+        [.255,.247],[.250,.265],[.204,.267],[.193,.247],[.173,.176],[.134,.105],[.065,.057],[0,.057]],m.porcelain,38).scale.z=1.24;
+      lathe(toilet,0,.520,0,[[.212,0],[.258,.004],[.262,.022],[.254,.037],
+        [.206,.037],[.192,.027],[.196,.011],[.212,0]],m.stone,38).scale.z=1.22;
+      cylinder(toilet,0,.373,0,.101,.003,new T.MeshPhysicalMaterial({
+        color:0x9da6a8,roughness:.18,clearcoat:.67,envMapIntensity:.45,
+      })).scale.z=1.25;
+      cylinder(toilet,0,.18,.10,.125,.33,m.porcelain);
+      const sprayRoot=group(toilet);
+      const flow=group(sprayRoot);
+      const stream=new T.CatmullRomCurve3([
+        new T.Vector3(0,1.00,-.55),new T.Vector3(0,.88,-.40),
+        new T.Vector3(0,.67,-.20),new T.Vector3(0,.391,-.035),
+      ]);
+      flow.add(new T.Mesh(new T.TubeGeometry(stream,24,.0025,6,false),new T.MeshStandardMaterial({
+        color:0xdfd7a4,transparent:true,opacity:.54,roughness:.24,depthWrite:false,
+      })));
+      moveable(sprayRoot);flow.visible=false;
+      flow.traverse(o=>{if(o.isMesh)o.castShadow=false;});
+      let running=0;
+      updates.push(dt=>{running=Math.max(0,running-dt);flow.visible=running>0;});
+      addProp(toilet,[0,.53,-.19],{
+        kind:'toilet',radius:.43,seat:worldPoint(toilet,0,1.30,0),
+        label:()=> 'Pee standing',
+        use(){running=2.6;flow.visible=true;return 'toilet-water';},
+        cancel(){running=0;flow.visible=false;},
+        reset(){this.cancel();},
+      });
       block(root,.9,.48,2.59,.57,1,.91);
       box(root,1.83,1.13,2.86,.79,.047,.07,m.brass);
       round(root,1.83,.958,2.871,.58,.49,.088,.041,f['oatmeal-linen']);

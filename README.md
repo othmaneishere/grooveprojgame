@@ -16,6 +16,8 @@ The controls menu has volume, mouse sensitivity, reduced camera motion, and dayl
 
 Doors use weighted hinges and stop against the player. You can also use light switches, lamps, fireplaces, taps, drawers, two dining chairs, the mantel clock, and the house ledger. Footsteps change with the floor surface. Fire, water, the clock, and drafts are spatially mixed, and closed doors damp sounds from adjoining rooms.
 
+In the upstairs bathroom, aim at the toilet and press **E** to pee standing or **X** to sit. The first time you sit, a loud impact plays and the house loses power. Press **E** to stand. The brass lighter is on the kitchen island. Pick it up with **E** and use **F** to light or close it. The touch controls expose the same actions. The impact uses the sound file supplied for the project and respects the game's volume setting.
+
 Vercel serves the prebuilt static files in `dist/`. There is no dependency install or application build. Three.js is included in `dist/vendor/` under its MIT license.
 
 ## Verify the house
